@@ -1,0 +1,15 @@
+[project]
+name = "nycu-parttime-signin-out-tester"
+version = "0.1.0"
+description = "Test the sign in and sign out flow of the NYCU part-time system"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "playwright>=1.57.0",
+    "pytest>=9.0.2",
+    "pytest-playwright>=0.7.2",
+    "python-dotenv>=1.2.1",
+]
+
+[tool.pytest.ini_options]
+markers = ["signin: tests for sign in flow", "signout: tests for sign out flow"]
