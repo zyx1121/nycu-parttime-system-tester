@@ -1,16 +1,65 @@
+import base64
+import datetime
+import hashlib
+import hmac
 import os
+import pathlib
 import time
+from urllib.parse import parse_qs, urlparse
+
+import dotenv
 import pytest
-
 from playwright.sync_api import Page, expect
-from dotenv import load_dotenv
 
-from totp import totp
+
+def save_screenshot(page: Page, name: str):
+
+    pathlib.Path("artifacts").mkdir(exist_ok=True)
+    date = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    page.screenshot(path=f"artifacts/{name}_{date}.png", full_page=True)
+
+
+def totp(uri: str) -> str:
+    """
+    Input:  otpauth://totp/XXX?secret=BASE32SECRET
+    Output: 6-digit TOTP (default: SHA1, 30s, 6 digits)
+    """
+
+    u = urlparse(uri.strip())
+    if u.scheme != "otpauth" or u.netloc.lower() != "totp":
+        raise ValueError("uri must be otpauth://totp/...")
+
+    qs = parse_qs(u.query)
+    secret = (qs.get("secret") or [None])[0]
+    if not secret:
+        raise ValueError("uri must have secret=...")
+
+    # Base32 decode (allow missing '=', allow lowercase/spaces)
+    s = secret.strip().replace(" ", "").upper()
+    s += "=" * ((-len(s)) % 8)
+    key = base64.b32decode(s, casefold=True)
+
+    # TOTP: counter = floor(time / 30)
+    counter = int(time.time()) // 30
+    msg = counter.to_bytes(8, "big")
+
+    # HOTP (RFC 4226) + dynamic truncation
+    h = hmac.new(key, msg, hashlib.sha1).digest()
+    offset = h[-1] & 0x0F
+    dbc = (
+        ((h[offset] & 0x7F) << 24)
+        | (h[offset + 1] << 16)
+        | (h[offset + 2] << 8)
+        | (h[offset + 3])
+    )
+
+    code = dbc % 1_000_000
+    return f"{code:06d}"
 
 
 def load_env():
 
-    load_dotenv()
+    dotenv.load_dotenv()
 
     account = os.getenv("ACCOUNT")
     password = os.getenv("PASSWORD")
@@ -44,7 +93,7 @@ def login_portal(page: Page, account: str, password: str, totp_uri: str):
     expect(dialog).to_be_hidden(timeout=60000)
 
 
-def open_timeclock_parttime_popup(page: Page) -> Page:
+def open_parttime(page: Page) -> Page:
 
     page.locator("li.el-menu-item.subitem", has_text="陽明交通大學").click(
         timeout=60000
@@ -106,11 +155,11 @@ def test_signin(page: Page):
 
     login_portal(page, account, password, totp_uri)
 
-    tc_page = open_timeclock_parttime_popup(page)
+    parttime_page = open_parttime(page)
 
-    signin(tc_page)
+    signin(parttime_page)
 
-    time.sleep(10)
+    save_screenshot(parttime_page, "signin")
 
 
 @pytest.mark.signout
@@ -120,8 +169,8 @@ def test_signout(page: Page):
 
     login_portal(page, account, password, totp_uri)
 
-    tc_page = open_timeclock_parttime_popup(page)
+    parttime_page = open_parttime(page)
 
-    signout(tc_page)
+    signout(parttime_page)
 
-    time.sleep(10)
+    save_screenshot(parttime_page, "signout")
