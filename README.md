@@ -10,7 +10,13 @@ This is a test suite for the sign in and sign out flow of the NYCU part-time sys
    uv sync
    ```
 
-2. Copy the `.env.example` file to `.env` and fill in the values:
+2. Install the Playwright browsers:
+
+   ```bash
+   uv run playwright install
+   ```
+
+3. Copy the `.env.example` file to `.env` and fill in the values:
 
    ```bash
    cp .env.example .env
@@ -37,6 +43,12 @@ This is a test suite for the sign in and sign out flow of the NYCU part-time sys
 
   ```bash
   uv run pytest --headed -m signout
+  ```
+
+- Schedule the tests:
+
+  ```bash
+  uv run python scheduler.py
   ```
 
 ## License
